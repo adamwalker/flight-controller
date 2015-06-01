@@ -1,3 +1,6 @@
+#include <matrix.hpp> 
+#include <quat.hpp>
+
 template <class T>
 struct params {
     T var_update_orient;
