@@ -149,7 +149,34 @@ void updateState(T dt, T state[7]){
 }
 
 template <class T>
-void kalman(struct params<T> params, T state[7], T covariance[7][7], T meas[7], T dt){
+struct kalman_state{
+    T state[7];
+    T covariance[7][7];
+};
+
+template <class T>
+void init_kalman_state(T var_pos_init, T var_angvel_init, struct kalman_state<T> *kalman_state){
+    int i, j;
+
+    kalman_state->state[0] = 1;
+    for(i=1; i<7; i++)
+        kalman_state->state[i] = 0;
+
+    for(i=0; i<7; i++){
+        for(j=0; j<7; j++){
+            kalman_state->covariance[i][j] = 0;
+        }
+    }
+
+    for(i=0; i<4; i++)
+        kalman_state->covariance[i][i] = var_pos_init;
+
+    for(; i<7; i++)
+        kalman_state->covariance[i][i] = var_angvel_init;
+}
+
+template <class T>
+void kalman(struct params<T> *params, T state[7], T covariance[7][7], T meas[7], T dt){
     // Compute jacobians
     T jacobian[7][7];
     computeJacobian(dt, state, jacobian);
@@ -164,8 +191,8 @@ void kalman(struct params<T> params, T state[7], T covariance[7][7], T meas[7], 
     T temp[7][7];
     mmult_yt(7, 7, 7, (T *)covariance, (T *)jacobian, (T *)temp);
     mmult(7, 7, 7, (T *)jacobian, (T *)temp, (T *)covariance);
-    T var_orient = params.var_update_orient * dt * dt;
-    T var_angvel = params.var_update_angvel * dt * dt;
+    T var_orient = params->var_update_orient * dt * dt;
+    T var_angvel = params->var_update_angvel * dt * dt;
     T q[7] = {
         var_orient, var_orient, var_orient, var_orient, 
         var_angvel, var_angvel, var_angvel
@@ -182,8 +209,8 @@ void kalman(struct params<T> params, T state[7], T covariance[7][7], T meas[7], 
     // Covariance residual
     T cov_resid[7][7];
     T r[7] = {
-        params.var_meas_orient, params.var_meas_orient, params.var_meas_orient, params.var_meas_orient, 
-        params.var_meas_angvel, params.var_meas_angvel, params.var_meas_angvel
+        params->var_meas_orient, params->var_meas_orient, params->var_meas_orient, params->var_meas_orient, 
+        params->var_meas_angvel, params->var_meas_angvel, params->var_meas_angvel
     };
     for(i=0; i<7; i++){
         for(j=0; j<7; j++){
@@ -222,3 +249,33 @@ void kalman(struct params<T> params, T state[7], T covariance[7][7], T meas[7], 
     }
 }
 
+template <class T>
+struct calibration{
+    T earth_grav[3];
+    T earth_mag[3];
+    T stat_gyro[3];
+};
+
+template <class T>
+struct measurements{
+    T body_grav[3];
+    T body_mag[3];
+    T body_gyro[3];
+};
+
+template <class T>
+void imu(struct calibration<T> *calibration, struct params<T> *params, struct measurements<T> *measurements, struct kalman_state<T> *kalman_state, T dt){
+    T meas[7];
+    int i;
+    for(i=0; i<4; i++){
+        meas[i] = kalman_state->state[i];
+    }
+     
+    gn(calibration->earth_grav, calibration->earth_mag, measurements->body_grav, measurements->body_mag, meas);
+
+    for(i=0; i<3; i++){
+        meas[i+4] = measurements->body_gyro[i];
+    }
+
+    kalman(params, kalman_state->state, kalman_state->covariance, meas, dt);
+}
