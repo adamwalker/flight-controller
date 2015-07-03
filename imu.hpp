@@ -34,8 +34,9 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
     normalize(3, body_mag,   body_mag);
     normalize(3, earth_grav, earth_grav);
     normalize(3, earth_mag,  earth_mag);
+
     size_t i;
-    for(i=0; i<100; i++){
+    for(i=0; i<50; i++){
         normalize(4, guess_q, guess_q);
 
         T body_grav_r[3], body_mag_r[3];
@@ -68,6 +69,8 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
         multv_position(3, 3, (T *)jd, body_mag,  4, (T *)jacobian, 3, 3);
 
         scale<T>(-1, 6, 4, (T *)jacobian, (T *)jacobian);
+        //Serial.printf("asdfasdf: \r\n");
+        //print_matrix(6, 4, (T *)jacobian);
 
         T r[4][4];
         qr(6, 4, (T *)jacobian, (T *)r);
@@ -270,12 +273,57 @@ void imu(struct calibration<T> *calibration, struct params<T> *params, struct me
     for(i=0; i<4; i++){
         meas[i] = kalman_state->state[i];
     }
+
+    /*
+    Serial.print("earth_grav: \r\n");
+    print_vect(3, calibration->earth_grav);
+    Serial.print("earth_mag: \r\n");
+    print_vect(3, calibration->earth_mag);
+    Serial.print("body_grav: \r\n");
+    print_vect(3, measurements->body_grav);
+    Serial.print("body_mag: \r\n");
+    print_vect(3, measurements->body_mag);
+    Serial.print("guess: \r\n");
+    print_vect(4, meas);
+    */
      
-    gn(calibration->earth_grav, calibration->earth_mag, measurements->body_grav, measurements->body_mag, meas);
+    jmp_buf jb;
+    jmp_buf *last_jb = overflow_exc;
+    overflow_exc = &jb;
+    int exc;
+
+    if(!(exc = setjmp(jb))){
+        gn(calibration->earth_grav, calibration->earth_mag, measurements->body_grav, measurements->body_mag, meas);
+    } else {
+        Serial.printf("Gauss Newtop exception: %d\n", exc);
+        for(;;);
+        overflow_exc = last_jb;
+        longjmp(*overflow_exc, exc);
+    }
+
+    /*
+    Serial.print("guess_after: \r\n");
+    print_vect(4, meas);
+    */
+
+    /*
+    for(i=0; i<4; i++){
+        kalman_state->state[i] = meas[i];
+    }
+    */
 
     for(i=0; i<3; i++){
         meas[i+4] = measurements->body_gyro[i];
     }
 
-    kalman(params, kalman_state->state, kalman_state->covariance, meas, dt);
+    if(!(exc = setjmp(jb))){
+        kalman(params, kalman_state->state, kalman_state->covariance, meas, dt);
+    } else {
+        Serial.printf("Kalman filter exception: %d\n", exc);
+        for(;;);
+        overflow_exc = last_jb;
+        longjmp(*overflow_exc, exc);
+    }
+
+    overflow_exc = last_jb;
 }
