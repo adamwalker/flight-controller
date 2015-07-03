@@ -35,7 +35,10 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
     normalize(3, earth_grav, earth_grav);
     normalize(3, earth_mag,  earth_mag);
 
-    size_t i;
+    fix16Exc grav_weight = 20;
+    fix16Exc mag_weight  = 1;
+
+    size_t i, j, k;
     for(i=0; i<50; i++){
         normalize(4, guess_q, guess_q);
 
@@ -46,6 +49,9 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
         T resid[6];
         subv(3, earth_grav, body_grav_r, resid);
         subv(3, earth_mag,  body_mag_r,  resid+3);
+
+        scalev(grav_weight, 3, resid, resid);
+        scalev(mag_weight, 3, resid+3, resid+3);
 
         T ja[3][3] = {{ guess_q[0], -guess_q[3], guess_q[2]}, {guess_q[3],  guess_q[0], -guess_q[1]}, {-guess_q[2], guess_q[1],  guess_q[0]}};
         T jb[3][3] = {{ guess_q[1],  guess_q[2], guess_q[3]}, {guess_q[2], -guess_q[1], -guess_q[0]}, { guess_q[3], guess_q[0], -guess_q[1]}};
@@ -68,9 +74,19 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
         multv_position(3, 3, (T *)jc, body_mag,  4, (T *)jacobian, 2, 3);
         multv_position(3, 3, (T *)jd, body_mag,  4, (T *)jacobian, 3, 3);
 
+        for(j=0; j<3; j++){
+            for(k=0; k<4; k++){
+                jacobian[j][k] = jacobian[j][k] * grav_weight;
+            }
+        }
+
+        for(; j<6; j++){
+            for(k=0; k<4; k++){
+                jacobian[j][k] = jacobian[j][k] * mag_weight;
+            }
+        }
+
         scale<T>(-1, 6, 4, (T *)jacobian, (T *)jacobian);
-        //Serial.printf("asdfasdf: \r\n");
-        //print_matrix(6, 4, (T *)jacobian);
 
         T r[4][4];
         qr(6, 4, (T *)jacobian, (T *)r);
