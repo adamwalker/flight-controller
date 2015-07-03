@@ -79,6 +79,8 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
         solve(6, 4, (T *)jacobian, (T *)r, resid, result);
         subv(4, guess_q, result, guess_q);
     }
+
+    normalize(4, guess_q, guess_q);
 }
 
 template <class T>
