@@ -27,13 +27,9 @@ void multv_position(size_t rows, size_t cols, T *m, T *v, size_t cols_out, T *ou
     }
 }
 
+//Assumes all measurements are normalized
 template <class T>
 void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_q[4]){
-
-    normalize(3, body_grav,  body_grav);
-    normalize(3, body_mag,   body_mag);
-    normalize(3, earth_grav, earth_grav);
-    normalize(3, earth_mag,  earth_mag);
 
     fix16Exc grav_weight = 20;
     fix16Exc mag_weight  = 1;
@@ -297,19 +293,6 @@ void imu(struct calibration<T> *calibration, struct params<T> *params, struct me
         meas[i] = kalman_state->state[i];
     }
 
-    /*
-    Serial.print("earth_grav: \r\n");
-    print_vect(3, calibration->earth_grav);
-    Serial.print("earth_mag: \r\n");
-    print_vect(3, calibration->earth_mag);
-    Serial.print("body_grav: \r\n");
-    print_vect(3, measurements->body_grav);
-    Serial.print("body_mag: \r\n");
-    print_vect(3, measurements->body_mag);
-    Serial.print("guess: \r\n");
-    print_vect(4, meas);
-    */
-     
     jmp_buf jb;
     jmp_buf *last_jb = overflow_exc;
     overflow_exc = &jb;
@@ -319,21 +302,9 @@ void imu(struct calibration<T> *calibration, struct params<T> *params, struct me
         gn(calibration->earth_grav, calibration->earth_mag, measurements->body_grav, measurements->body_mag, meas);
     } else {
         Serial.printf("Gauss Newtop exception: %d\n", exc);
-        for(;;);
         overflow_exc = last_jb;
         longjmp(*overflow_exc, exc);
     }
-
-    /*
-    Serial.print("guess_after: \r\n");
-    print_vect(4, meas);
-    */
-
-    /*
-    for(i=0; i<4; i++){
-        kalman_state->state[i] = meas[i];
-    }
-    */
 
     for(i=0; i<3; i++){
         meas[i+4] = measurements->body_gyro[i];
@@ -343,7 +314,6 @@ void imu(struct calibration<T> *calibration, struct params<T> *params, struct me
         kalman(params, kalman_state->state, kalman_state->covariance, meas, dt);
     } else {
         Serial.printf("Kalman filter exception: %d\n", exc);
-        for(;;);
         overflow_exc = last_jb;
         longjmp(*overflow_exc, exc);
     }
