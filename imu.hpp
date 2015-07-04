@@ -94,6 +94,11 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
         T result[4];
         solve(6, 4, (T *)jacobian, (T *)r, resid, result);
         subv(4, guess_q, result, guess_q);
+
+        if(result[0] < T(0.01) && result[1] < T(0.01) && result[2] < T(0.01) && result[3] < T(0.01)){
+            //Serial.printf("Iters: %d\r\n", i);
+            break;
+        }
     }
 
     normalize(4, guess_q, guess_q);
