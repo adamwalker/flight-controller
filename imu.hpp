@@ -10,6 +10,12 @@ struct params {
 };
 
 template <class T>
+struct gn_weights {
+    fix16Exc grav_weight;
+    fix16Exc mag_weight;
+};
+
+template <class T>
 void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_q[4]);
 
 template <class T>
@@ -29,10 +35,7 @@ void multv_position(size_t rows, size_t cols, T *m, T *v, size_t cols_out, T *ou
 
 //Assumes all measurements are normalized
 template <class T>
-void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_q[4]){
-
-    fix16Exc grav_weight = 20;
-    fix16Exc mag_weight  = 1;
+void gn(struct gn_weights<T> *weights, T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_q[4]){
 
     size_t i, j, k;
     for(i=0; i<50; i++){
@@ -46,8 +49,8 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
         subv(3, earth_grav, body_grav_r, resid);
         subv(3, earth_mag,  body_mag_r,  resid+3);
 
-        scalev(grav_weight, 3, resid, resid);
-        scalev(mag_weight, 3, resid+3, resid+3);
+        scalev(weights->grav_weight, 3, resid, resid);
+        scalev(weights->mag_weight, 3, resid+3, resid+3);
 
         T ja[3][3] = {{ guess_q[0], -guess_q[3], guess_q[2]}, {guess_q[3],  guess_q[0], -guess_q[1]}, {-guess_q[2], guess_q[1],  guess_q[0]}};
         T jb[3][3] = {{ guess_q[1],  guess_q[2], guess_q[3]}, {guess_q[2], -guess_q[1], -guess_q[0]}, { guess_q[3], guess_q[0], -guess_q[1]}};
@@ -72,13 +75,13 @@ void gn(T earth_grav[3], T earth_mag[3], T body_grav[3], T body_mag[3], T guess_
 
         for(j=0; j<3; j++){
             for(k=0; k<4; k++){
-                jacobian[j][k] = jacobian[j][k] * grav_weight;
+                jacobian[j][k] = jacobian[j][k] * weights->grav_weight;
             }
         }
 
         for(; j<6; j++){
             for(k=0; k<4; k++){
-                jacobian[j][k] = jacobian[j][k] * mag_weight;
+                jacobian[j][k] = jacobian[j][k] * weights->mag_weight;
             }
         }
 
@@ -286,7 +289,7 @@ struct measurements{
 };
 
 template <class T>
-void imu(struct calibration<T> *calibration, struct params<T> *params, struct measurements<T> *measurements, struct kalman_state<T> *kalman_state, T dt){
+void imu(struct calibration<T> *calibration, struct params<T> *params, struct gn_weights<T> *weights, struct measurements<T> *measurements, struct kalman_state<T> *kalman_state, T dt){
     T meas[7];
     int i;
     for(i=0; i<4; i++){
@@ -299,7 +302,7 @@ void imu(struct calibration<T> *calibration, struct params<T> *params, struct me
     int exc;
 
     if(!(exc = setjmp(jb))){
-        gn(calibration->earth_grav, calibration->earth_mag, measurements->body_grav, measurements->body_mag, meas);
+        gn(weights, calibration->earth_grav, calibration->earth_mag, measurements->body_grav, measurements->body_mag, meas);
     } else {
         Serial.printf("Gauss Newtop exception: %d\n", exc);
         overflow_exc = last_jb;
