@@ -107,20 +107,24 @@ template <class T>
 void computeJacobian(T dt, T state[7], T jacobian[7][7]){
 
     T w=state[0], x=state[1], y=state[2], z=state[3], p=state[4], q=state[5], r=state[6];
-    T jacobian2[7][7] = {
+    T jacobian2[4][7] = {
         {0, -p, -q, -r, -x, -y, -z},
         {p,  0,  r, -q,  w, -z,  y},
         {q, -r,  0,  p,  z,  w, -x},
         {r,  q, -p,  0, -y,  x,  w},
-        {0,  0,  0,  0,  0,  0,  0},
-        {0,  0,  0,  0,  0,  0,  0},
-        {0,  0,  0,  0,  0,  0,  0}
     };
 
     int i, j;
-    for(i=0; i<7; i++){
+
+    for(i=0; i<4; i++){
         for(j=0; j<7; j++){
             jacobian[i][j] = jacobian2[i][j];
+        }
+    }
+
+    for(; i<7; i++){
+        for(j=0; j<7; j++){
+            jacobian[i][j] = 0;
         }
     }
 
